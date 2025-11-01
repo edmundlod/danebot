@@ -76,7 +76,6 @@ check:
 		if [ $$? != 0 ]; then echo "Error: Perl module $$x is required but is not installed"; fail=1; fi; \
 	done; \
 	[ $$fail = 0 ] || exit 1
-	[ $$fail = 0 ] || exit 1
 
 install-bin:
 	@if [ ! -d "$(bindir)" ]; then echo "$(bindir) does not exist (adjust Makefile)"; exit 1; fi
