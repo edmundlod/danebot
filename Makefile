@@ -72,9 +72,10 @@ check:
 	if [ $$found = 0 ]; then echo "Error: one of $(prereqs_oneof) is required but neither is installed"; fail=1; fi; \
 	for x in $(prereqs_perl); \
 	do \
-		perldoc $$x >/dev/null 2>&1; \
+		perl -M$$x -e1 >/dev/null 2>&1; \
 		if [ $$? != 0 ]; then echo "Error: Perl module $$x is required but is not installed"; fail=1; fi; \
 	done; \
+	[ $$fail = 0 ] || exit 1
 	[ $$fail = 0 ] || exit 1
 
 install-bin:
