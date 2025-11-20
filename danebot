@@ -29,6 +29,9 @@ fi
 # CONFIGURATION section
 # These parameters can be overridden by placing new values in /etc/default/danebot
 
+# Log file location
+LOGFILE="/var/log/danebot.log"
+
 # ADVANCED: The file permissions of the "combo.pem" chain + key file.
 # When in doubt, leave the default in place.
 #
@@ -67,6 +70,33 @@ TTL=2
 #
 NS=127.0.0.1
 ## --------------
+
+# Logging function
+# Generic logging function
+log() {
+    local level="$1"
+    local msg="$2"
+    local timestamp
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+
+    # Print to screen
+    case "$level" in
+        INFO)  echo "[$timestamp] [$level] $msg" ;;
+        WARN|ERROR) echo "[$timestamp] [$level] $msg" >&2 ;;
+        *) echo "[$timestamp] [UNKNOWN] $msg" >&2 ;;
+    esac
+
+    # Ensure log directory exists
+    mkdir -p "$(dirname "$LOGFILE")" 2>/dev/null || :
+
+    # Append to logfile, do not fail if logfile cannot be written
+    printf "[%s] [%s] %s\n" "$timestamp" "$level" "$msg" >> "$LOGFILE" 2>/dev/null
+}
+
+# Convenience wrappers
+log_info()  { log "INFO" "$1"; }
+log_warn()  { log "WARN" "$1"; }
+log_error() { log "ERROR" "$1"; }
 
 # Allow replacement configuration by a user
 # Choices for Linux/Solaris, FreeBSD/macOS, OpenBSD, NetBSD, macports
