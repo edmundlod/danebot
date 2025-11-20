@@ -29,10 +29,6 @@ fi
 # CONFIGURATION section
 # These parameters can be overridden by placing new values in /etc/default/danebot
 
-# Key rollover parameters
-KEYALG="rsa"
-KEYOPTS=(rsa_keygen_bits:2048)
-
 # ADVANCED: The file permissions of the "combo.pem" chain + key file.
 # When in doubt, leave the default in place.
 #
@@ -87,6 +83,53 @@ export LANG=C LC_ALL=C LC_CTYPE=C IDN_DISABLE=1
 checkpipe() {
     set -- "${PIPESTATUS[@]}"
     local ec; for ec; do if [[ "$ec" != 0 ]]; then return 1; fi; done
+}
+
+# Detect per-lineage KEYALG and KEYOPTS from renewal config
+detect_keyalg() {
+    local lineage="$1"
+    local conf="renewal/${lineage}.conf"
+    local default_rsa_size=2048
+    local default_ecdsa_curve="prime256v1"
+
+    if [[ ! -f "$conf" ]]; then
+        log_error "Renewal config '$conf' not found for lineage '$lineage'"
+        return 1
+    fi
+
+    # Initialise/Reset variables
+    KEYALG=""
+    KEYOPTS=()
+
+    # Extract key_type from renewal config
+    local key_type key_curve key_rsa
+    key_type=$(awk -F= '/^\s*key_type\s*=/ {gsub(/ /,"",$2); print $2}' "$conf" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$key_type" == "ecdsa" ]]; then
+        # Extract curve if present
+        key_curve=$(awk -F= '/^\s*ec_curve\s*=/ {gsub(/ /,"",$2); print $2}' "$conf")
+        KEYALG="ecdsa"
+        KEYOPTS=("ec_paramgen_curve:${key_curve:-$default_ecdsa_curve}")
+        if [[ -z "$key_curve" ]]; then
+            log_warn "No ec_curve specified in $conf, falling back to default $default_ecdsa_curve for lineage '$lineage'"
+        fi
+    elif [[ "$key_type" == "rsa" || -z "$key_type" ]]; then
+        # Extract RSA size if present
+        key_rsa=$(awk -F= '/^\s*rsa_key_size\s*=/ {gsub(/ /,"",$2); print $2}' "$conf")
+        KEYALG="rsa"
+        KEYOPTS=("rsa_keygen_bits:${key_rsa:-$default_rsa_size}")
+        if [[ -z "$key_rsa" ]]; then
+            if [[ -z "$key_type" ]]; then
+                log_warn "No key_type specified in $conf, assuming default RSA for lineage '$lineage'"
+            fi
+            log_warn "No rsa_key_size specified in $conf, falling back to default $default_rsa_size for lineage '$lineage'"
+        fi
+    else
+        log_error "Unsupported key_type '$key_type' in $conf for lineage '$lineage'"
+        return 1
+    fi
+
+    log_info "Lineage '$lineage': using KEYALG=$KEYALG, KEYOPTS=${KEYOPTS[*]}"
 }
 
 # Extract various details from a PEM file.
